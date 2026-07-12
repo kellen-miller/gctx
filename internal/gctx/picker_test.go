@@ -13,14 +13,14 @@ func TestEmbeddedFZFSelectsMatchingConfiguration(t *testing.T) {
 	t.Setenv("FZF_DEFAULT_OPTS_FILE", "")
 
 	selected, err := (fzfPicker{options: []string{"--filter=example-dev"}}).pick(t.Context(), []string{
-		"example-old\told@example.com\told-project\told-quota",
-		"example-dev\tuser@example.com\texample-project\texample-quota",
+		"example-old\texample-old  old@example.com    old-project      old-quota",
+		"example-dev\texample-dev  user@example.com  example-project  example-quota",
 	})
 
 	if err != nil {
 		t.Fatalf("pick() error = %v", err)
 	}
-	want := "example-dev\tuser@example.com\texample-project\texample-quota"
+	want := "example-dev"
 	if selected != want {
 		t.Fatalf("pick() = %q, want %q", selected, want)
 	}

@@ -25,6 +25,7 @@ const (
 	briefFlag                  = "--brief"
 	noActivateFlag             = "--no-activate"
 	updateADCFlag              = "--update-adc"
+	verbosityErrorFlag         = "--verbosity=error"
 	quietFlag                  = "--quiet"
 	cleanupTimeout             = 15 * time.Second
 )
@@ -119,16 +120,7 @@ func (manager *Manager) SelectAndSwitch(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	rows := make([]string, 0, len(configurations))
-	for _, candidate := range configurations {
-		rows = append(rows, fmt.Sprintf(
-			"%s\t%s\t%s\t%s",
-			candidate.Name,
-			valueOr(candidate.Properties.Core.Account, "<account unset>"),
-			valueOr(candidate.Properties.Core.Project, "<project unset>"),
-			valueOr(candidate.Properties.Billing.QuotaProject, "<quota unset>"),
-		))
-	}
+	rows := formatConfigurationRows(configurations)
 	selected, err := manager.picker.pick(ctx, rows)
 	if err != nil {
 		if errors.Is(err, ErrSelectionCanceled) {
@@ -148,6 +140,31 @@ func (manager *Manager) SelectAndSwitch(ctx context.Context) (Result, error) {
 		return Result{}, errors.New("fzf returned a malformed configuration selection")
 	}
 	return manager.switchConfiguration(ctx, configurations, name)
+}
+
+func formatConfigurationRows(configurations []configuration) []string {
+	nameWidth, accountWidth, projectWidth := 0, 0, 0
+	for _, candidate := range configurations {
+		nameWidth = max(nameWidth, len(candidate.Name))
+		accountWidth = max(accountWidth, len(valueOr(candidate.Properties.Core.Account, "<account unset>")))
+		projectWidth = max(projectWidth, len(valueOr(candidate.Properties.Core.Project, "<project unset>")))
+	}
+
+	rows := make([]string, 0, len(configurations))
+	for _, candidate := range configurations {
+		rows = append(rows, fmt.Sprintf(
+			"%s\t%-*s  %-*s  %-*s  %s",
+			candidate.Name,
+			nameWidth,
+			candidate.Name,
+			accountWidth,
+			valueOr(candidate.Properties.Core.Account, "<account unset>"),
+			projectWidth,
+			valueOr(candidate.Properties.Core.Project, "<project unset>"),
+			valueOr(candidate.Properties.Billing.QuotaProject, "<quota unset>"),
+		))
+	}
+	return rows
 }
 
 func valueOr(value, fallback string) string {
@@ -280,6 +297,7 @@ func (manager *Manager) synchronizeAndActivate(
 		briefFlag,
 		noActivateFlag,
 		updateADCFlag,
+		verbosityErrorFlag,
 		configurationFlag,
 	}
 	if err := manager.runner.run(

@@ -140,6 +140,7 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 					"--brief",
 					"--no-activate",
 					"--update-adc",
+					"--verbosity=error",
 					"--configuration=example-dev",
 				},
 			) {
@@ -182,6 +183,7 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 			"--brief",
 			"--no-activate",
 			"--update-adc",
+			"--verbosity=error",
 			"--configuration=example-dev",
 		},
 		{"auth", "application-default", "set-quota-project", "example-quota", "--configuration=example-dev"},
@@ -675,7 +677,7 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 		}
 		return nil
 	}}
-	picker := &fakePicker{selection: "example-dev\tuser@example.com\texample-project\texample-quota"}
+	picker := &fakePicker{selection: "example-dev"}
 	manager := newManagerWithPicker(runner, picker, strings.NewReader(""), io.Discard, io.Discard)
 
 	result, err := manager.SelectAndSwitch(t.Context())
@@ -686,11 +688,18 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 	if result.Name != "example-dev" {
 		t.Fatalf("result = %#v", result)
 	}
-	if !slices.Contains(picker.rows, "incomplete\t<account unset>\t<project unset>\t<quota unset>") {
-		t.Fatalf("picker rows = %q, want visible incomplete row", picker.rows)
+	for _, row := range picker.rows {
+		if strings.Count(row, "\t") != 1 {
+			t.Fatalf("picker row = %q, want one hidden-key delimiter", row)
+		}
 	}
-	if !slices.Contains(picker.rows, "example-dev\tuser@example.com\texample-project\texample-quota") {
-		t.Fatalf("picker rows = %q, want complete row", picker.rows)
+	wantRows := []string{
+		"incomplete\tincomplete   <account unset>   <project unset>  <quota unset>",
+		"example-old\texample-old  old@example.com   old-project      old-quota",
+		"example-dev\texample-dev  user@example.com  example-project  example-quota",
+	}
+	if !slices.Equal(picker.rows, wantRows) {
+		t.Fatalf("picker rows = %q, want aligned rows %q", picker.rows, wantRows)
 	}
 	listCalls := 0
 	for _, call := range runner.calls {
