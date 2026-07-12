@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -23,7 +22,24 @@ type fakeRunner struct {
 	handler func(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) error
 }
 
-func (f *fakeRunner) run(_ context.Context, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+type fakePicker struct {
+	rows      []string
+	selection string
+	err       error
+}
+
+func (picker *fakePicker) pick(_ context.Context, rows []string) (string, error) {
+	picker.rows = slices.Clone(rows)
+	return picker.selection, picker.err
+}
+
+func (f *fakeRunner) run(
+	_ context.Context,
+	name string,
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+) error {
 	f.calls = append(f.calls, recordedCall{name: name, args: slices.Clone(args)})
 	if f.handler == nil {
 		return nil
@@ -39,12 +55,15 @@ func TestCurrentReturnsActiveNativeConfiguration(t *testing.T) {
 		if args[0] != "config" {
 			t.Fatalf("unexpected args: %q", args)
 		}
-		_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, "user@example.com", "example-project", "example-quota"))
+		_, _ = io.WriteString(
+			stdout,
+			configurationJSON("user@example.com", "example-project", "example-quota"),
+		)
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	name, err := manager.Current(context.Background())
+	name, err := manager.Current(t.Context())
 
 	if err != nil {
 		t.Fatalf("Current() error = %v", err)
@@ -52,7 +71,12 @@ func TestCurrentReturnsActiveNativeConfiguration(t *testing.T) {
 	if name != "example-dev" {
 		t.Fatalf("Current() = %q, want example-dev", name)
 	}
-	wantArgs := []string{"config", "configurations", "list", "--format=json(name,is_active,properties.core.account,properties.core.project,properties.billing.quota_project)"}
+	wantArgs := []string{
+		"config",
+		"configurations",
+		"list",
+		"--format=json(name,is_active,properties.core.account,properties.core.project,properties.billing.quota_project)",
+	}
 	if len(runner.calls) != 1 || !slices.Equal(runner.calls[0].args, wantArgs) {
 		t.Fatalf("calls = %#v, want one gcloud %q", runner.calls, wantArgs)
 	}
@@ -60,10 +84,10 @@ func TestCurrentReturnsActiveNativeConfiguration(t *testing.T) {
 
 func TestEveryOperationRejectsContextOverridesBeforeNativeCommands(t *testing.T) {
 	operations := map[string]func(*Manager) error{
-		"current":  func(m *Manager) error { _, err := m.Current(context.Background()); return err },
-		"direct":   func(m *Manager) error { _, err := m.Switch(context.Background(), "example-dev"); return err },
-		"previous": func(m *Manager) error { _, err := m.SwitchPrevious(context.Background()); return err },
-		"fuzzy":    func(m *Manager) error { _, err := m.SelectAndSwitch(context.Background()); return err },
+		"current":  func(m *Manager) error { _, err := m.Current(t.Context()); return err },
+		"direct":   func(m *Manager) error { _, err := m.Switch(t.Context(), "example-dev"); return err },
+		"previous": func(m *Manager) error { _, err := m.SwitchPrevious(t.Context()); return err },
+		"fuzzy":    func(m *Manager) error { _, err := m.SelectAndSwitch(t.Context()); return err },
 	}
 	overrides := []string{"GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_ACTIVE_CONFIG_NAME"}
 
@@ -74,7 +98,7 @@ func TestEveryOperationRejectsContextOverridesBeforeNativeCommands(t *testing.T)
 				t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
 				t.Setenv(override, "set")
 				runner := &fakeRunner{}
-				manager := newManager(runner, nil, io.Discard, io.Discard)
+				manager := newManager(runner, io.Discard, io.Discard)
 
 				err := operation(manager)
 
@@ -108,10 +132,23 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 		case "info":
 			_, _ = io.WriteString(stdout, directory+"\n")
 		case "auth":
-			if slices.Equal(args[1:], []string{"login", "user@example.com", "--brief", "--no-activate", "--update-adc", "--configuration=example-dev"}) {
+			if slices.Equal(
+				args[1:],
+				[]string{
+					"login",
+					"user@example.com",
+					"--brief",
+					"--no-activate",
+					"--update-adc",
+					"--configuration=example-dev",
+				},
+			) {
 				return os.WriteFile(adcPath, []byte("target-without-quota"), 0o600)
 			}
-			if slices.Equal(args[1:], []string{"application-default", "set-quota-project", "example-quota", "--configuration=example-dev"}) {
+			if slices.Equal(
+				args[1:],
+				[]string{"application-default", "set-quota-project", "example-quota", "--configuration=example-dev"},
+			) {
 				return os.WriteFile(adcPath, []byte("target-with-quota"), 0o600)
 			}
 			t.Fatalf("unexpected auth args: %q", args)
@@ -120,9 +157,9 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	result, err := manager.Switch(context.Background(), "example-dev")
+	result, err := manager.Switch(t.Context(), "example-dev")
 
 	if err != nil {
 		t.Fatalf("Switch() error = %v", err)
@@ -131,9 +168,22 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 	wantCalls := [][]string{
-		{"config", "configurations", "list", "--format=json(name,is_active,properties.core.account,properties.core.project,properties.billing.quota_project)"},
+		{
+			"config",
+			"configurations",
+			"list",
+			"--format=json(name,is_active,properties.core.account,properties.core.project,properties.billing.quota_project)",
+		},
 		{"info", "--format=value(config.paths.global_config_dir)"},
-		{"auth", "login", "user@example.com", "--brief", "--no-activate", "--update-adc", "--configuration=example-dev"},
+		{
+			"auth",
+			"login",
+			"user@example.com",
+			"--brief",
+			"--no-activate",
+			"--update-adc",
+			"--configuration=example-dev",
+		},
 		{"auth", "application-default", "set-quota-project", "example-quota", "--configuration=example-dev"},
 		{"config", "configurations", "activate", "example-dev", "--quiet"},
 	}
@@ -176,7 +226,22 @@ func TestQuotaFailureRestoresExactPriorADC(t *testing.T) {
 			runner := &fakeRunner{handler: func(_ string, args []string, _ io.Reader, stdout, _ io.Writer) error {
 				switch args[0] {
 				case "config":
-					_, _ = io.WriteString(stdout, "["+configurationObject("example-old", true, "old@example.com", "old-project", "old-quota")+","+configurationObject("example-dev", false, "user@example.com", "example-project", "example-quota")+"]")
+					_, _ = io.WriteString(
+						stdout,
+						"["+configurationObject(
+							"example-old",
+							true,
+							"old@example.com",
+							"old-project",
+							"old-quota",
+						)+","+configurationObject(
+							"example-dev",
+							false,
+							"user@example.com",
+							"example-project",
+							"example-quota",
+						)+"]",
+					)
 				case "info":
 					_, _ = io.WriteString(stdout, directory)
 				case "auth":
@@ -187,9 +252,9 @@ func TestQuotaFailureRestoresExactPriorADC(t *testing.T) {
 				}
 				return nil
 			}}
-			manager := newManager(runner, nil, io.Discard, &stderr)
+			manager := newManager(runner, io.Discard, &stderr)
 
-			_, err := manager.Switch(context.Background(), "example-dev")
+			_, err := manager.Switch(t.Context(), "example-dev")
 
 			if err == nil || !strings.Contains(err.Error(), "quota") {
 				t.Fatalf("Switch() error = %v, want quota failure", err)
@@ -202,7 +267,8 @@ func TestQuotaFailureRestoresExactPriorADC(t *testing.T) {
 			} else if !errors.Is(readErr, os.ErrNotExist) {
 				t.Fatalf("new ADC still exists: %q, err=%v", contents, readErr)
 			}
-			if strings.Contains(stderr.String(), "must-not-appear") || strings.Contains(err.Error(), "must-not-appear") {
+			if strings.Contains(stderr.String(), "must-not-appear") ||
+				strings.Contains(err.Error(), "must-not-appear") {
 				t.Fatal("credential content leaked into output")
 			}
 			if _, statErr := os.Stat(filepath.Join(directory, stateFilename)); !errors.Is(statErr, os.ErrNotExist) {
@@ -222,22 +288,49 @@ func TestSwitchRejectsInvalidConfigurationBeforeCredentialChanges(t *testing.T) 
 		quota   string
 		want    string
 	}{
-		{name: "missing account", project: "example-project", quota: "example-quota", want: "gcloud config set account"},
-		{name: "service account", account: "robot@example.iam.gserviceaccount.com", project: "example-project", quota: "example-quota", want: "human user accounts only"},
-		{name: "unsupported principal", account: "principal-without-email", project: "example-project", quota: "example-quota", want: "human user accounts only"},
-		{name: "missing project", account: "user@example.com", quota: "example-quota", want: "gcloud config set project"},
-		{name: "missing quota", account: "user@example.com", project: "example-project", want: "gcloud config set billing/quota_project"},
+		{
+			name:    "missing account",
+			project: "example-project",
+			quota:   "example-quota",
+			want:    "gcloud config set account",
+		},
+		{
+			name:    "service account",
+			account: "robot@example.iam.gserviceaccount.com",
+			project: "example-project",
+			quota:   "example-quota",
+			want:    "human user accounts only",
+		},
+		{
+			name:    "unsupported principal",
+			account: "principal-without-email",
+			project: "example-project",
+			quota:   "example-quota",
+			want:    "human user accounts only",
+		},
+		{
+			name:    "missing project",
+			account: "user@example.com",
+			quota:   "example-quota",
+			want:    "gcloud config set project",
+		},
+		{
+			name:    "missing quota",
+			account: "user@example.com",
+			project: "example-project",
+			want:    "gcloud config set billing/quota_project",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runner := &fakeRunner{handler: func(_ string, _ []string, _ io.Reader, stdout, _ io.Writer) error {
-				_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, tt.account, tt.project, tt.quota))
+				_, _ = io.WriteString(stdout, configurationJSON(tt.account, tt.project, tt.quota))
 				return nil
 			}}
-			manager := newManager(runner, nil, io.Discard, io.Discard)
+			manager := newManager(runner, io.Discard, io.Discard)
 
-			_, err := manager.Switch(context.Background(), "example-dev")
+			_, err := manager.Switch(t.Context(), "example-dev")
 
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("error = %v, want %q", err, tt.want)
@@ -253,12 +346,15 @@ func TestSwitchRejectsUnknownConfiguration(t *testing.T) {
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 	t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
 	runner := &fakeRunner{handler: func(_ string, _ []string, _ io.Reader, stdout, _ io.Writer) error {
-		_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, "user@example.com", "example-project", "example-quota"))
+		_, _ = io.WriteString(
+			stdout,
+			configurationJSON("user@example.com", "example-project", "example-quota"),
+		)
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	_, err := manager.Switch(context.Background(), "missing")
+	_, err := manager.Switch(t.Context(), "missing")
 
 	if err == nil || !strings.Contains(err.Error(), `configuration "missing" was not found`) {
 		t.Fatalf("error = %v", err)
@@ -284,7 +380,13 @@ func TestActivationFailureRestoresADCAndPreviousConfiguration(t *testing.T) {
 			if args[2] == "list" {
 				_, _ = io.WriteString(stdout, "["+
 					configurationObject("example-old", true, "old@example.com", "old-project", "old-quota")+","+
-					configurationObject("example-dev", false, "user@example.com", "example-project", "example-quota")+"]")
+					configurationObject(
+						"example-dev",
+						false,
+						"user@example.com",
+						"example-project",
+						"example-quota",
+					)+"]")
 				return nil
 			}
 			active = args[3]
@@ -300,9 +402,9 @@ func TestActivationFailureRestoresADCAndPreviousConfiguration(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	_, err := manager.Switch(context.Background(), "example-dev")
+	_, err := manager.Switch(t.Context(), "example-dev")
 
 	if err == nil || !strings.Contains(err.Error(), "activation failed") {
 		t.Fatalf("error = %v, want activation failure", err)
@@ -327,7 +429,13 @@ type cancellationRunner struct {
 	active    string
 }
 
-func (runner *cancellationRunner) run(ctx context.Context, _ string, args []string, _ io.Reader, stdout, _ io.Writer) error {
+func (runner *cancellationRunner) run(
+	ctx context.Context,
+	_ string,
+	args []string,
+	_ io.Reader,
+	stdout, _ io.Writer,
+) error {
 	switch args[0] {
 	case "config":
 		switch args[2] {
@@ -364,9 +472,9 @@ func TestInterruptedActivationUsesCleanupContext(t *testing.T) {
 	if err := os.WriteFile(adcPath, priorADC, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	runner := &cancellationRunner{cancel: cancel, directory: directory, active: "example-old"}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
 	_, err := manager.Switch(ctx, "example-dev")
 
@@ -397,7 +505,13 @@ func TestStateCommitFailureWarnsWithoutUndoingSwitch(t *testing.T) {
 			if args[2] == "list" {
 				_, _ = io.WriteString(stdout, "["+
 					configurationObject("example-old", true, "old@example.com", "old-project", "old-quota")+","+
-					configurationObject("example-dev", false, "user@example.com", "example-project", "example-quota")+"]")
+					configurationObject(
+						"example-dev",
+						false,
+						"user@example.com",
+						"example-project",
+						"example-quota",
+					)+"]")
 			} else {
 				activated = true
 				staged, _ := filepath.Glob(filepath.Join(directory, ".gctx-state-*.tmp"))
@@ -414,9 +528,9 @@ func TestStateCommitFailureWarnsWithoutUndoingSwitch(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	result, err := manager.Switch(context.Background(), "example-dev")
+	result, err := manager.Switch(t.Context(), "example-dev")
 
 	if err != nil {
 		t.Fatalf("Switch() error = %v", err)
@@ -446,7 +560,10 @@ func TestSameConfigurationResynchronizesWithoutChangingPreviousState(t *testing.
 		switch args[0] {
 		case "config":
 			if args[2] == "list" {
-				_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, "user@example.com", "example-project", "example-quota"))
+				_, _ = io.WriteString(
+					stdout,
+					configurationJSON("user@example.com", "example-project", "example-quota"),
+				)
 			}
 		case "info":
 			_, _ = io.WriteString(stdout, directory)
@@ -457,9 +574,9 @@ func TestSameConfigurationResynchronizesWithoutChangingPreviousState(t *testing.
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	_, err := manager.Switch(context.Background(), "example-dev")
+	_, err := manager.Switch(t.Context(), "example-dev")
 
 	if err != nil {
 		t.Fatalf("Switch() error = %v", err)
@@ -498,11 +615,12 @@ func TestRollbackFailureReportsPrimaryAndSafeRecoveryPath(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	_, err := manager.Switch(context.Background(), "example-dev")
+	_, err := manager.Switch(t.Context(), "example-dev")
 
-	if err == nil || !strings.Contains(err.Error(), "quota denied") || !strings.Contains(err.Error(), "ADC rollback failed") {
+	if err == nil || !strings.Contains(err.Error(), "quota denied") ||
+		!strings.Contains(err.Error(), "ADC rollback failed") {
 		t.Fatalf("error = %v, want primary and rollback failures", err)
 	}
 	if strings.Contains(err.Error(), "prior-secret") {
@@ -517,36 +635,22 @@ func TestCurrentRejectsMalformedNativeOutput(t *testing.T) {
 		_, _ = io.WriteString(stdout, "not-json")
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	_, err := manager.Current(context.Background())
+	_, err := manager.Current(t.Context())
 
 	if err == nil || !strings.Contains(err.Error(), "decode gcloud configurations") {
 		t.Fatalf("error = %v, want decode failure", err)
 	}
 }
 
-type fakeExitError struct {
-	code int
-}
-
-func (error fakeExitError) Error() string { return "exited" }
-func (error fakeExitError) ExitCode() int { return error.code }
-
-func TestSelectAndSwitchUsesFZFAndStrictSwitchPath(t *testing.T) {
+func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 	t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
 	directory := t.TempDir()
-	var pickerInput string
-	runner := &fakeRunner{handler: func(name string, args []string, stdin io.Reader, stdout, _ io.Writer) error {
-		if name == "fzf" {
-			data, err := io.ReadAll(stdin)
-			if err != nil {
-				return err
-			}
-			pickerInput = string(data)
-			_, _ = io.WriteString(stdout, "example-dev\tuser@example.com\texample-project\texample-quota\n")
-			return nil
+	runner := &fakeRunner{handler: func(name string, args []string, _ io.Reader, stdout, _ io.Writer) error {
+		if name != "gcloud" {
+			t.Fatalf("external command = %q, want only gcloud", name)
 		}
 		switch args[0] {
 		case "config":
@@ -554,7 +658,13 @@ func TestSelectAndSwitchUsesFZFAndStrictSwitchPath(t *testing.T) {
 				_, _ = io.WriteString(stdout, "["+
 					configurationObject("incomplete", false, "", "", "")+","+
 					configurationObject("example-old", true, "old@example.com", "old-project", "old-quota")+","+
-					configurationObject("example-dev", false, "user@example.com", "example-project", "example-quota")+"]")
+					configurationObject(
+						"example-dev",
+						false,
+						"user@example.com",
+						"example-project",
+						"example-quota",
+					)+"]")
 			}
 		case "info":
 			_, _ = io.WriteString(stdout, directory)
@@ -565,9 +675,10 @@ func TestSelectAndSwitchUsesFZFAndStrictSwitchPath(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, strings.NewReader(""), io.Discard, io.Discard)
+	picker := &fakePicker{selection: "example-dev\tuser@example.com\texample-project\texample-quota"}
+	manager := newManagerWithPicker(runner, picker, strings.NewReader(""), io.Discard, io.Discard)
 
-	result, err := manager.SelectAndSwitch(context.Background())
+	result, err := manager.SelectAndSwitch(t.Context())
 
 	if err != nil {
 		t.Fatalf("SelectAndSwitch() error = %v", err)
@@ -575,11 +686,11 @@ func TestSelectAndSwitchUsesFZFAndStrictSwitchPath(t *testing.T) {
 	if result.Name != "example-dev" {
 		t.Fatalf("result = %#v", result)
 	}
-	if !strings.Contains(pickerInput, "incomplete\t<account unset>\t<project unset>\t<quota unset>") {
-		t.Fatalf("picker input = %q, want visible incomplete row", pickerInput)
+	if !slices.Contains(picker.rows, "incomplete\t<account unset>\t<project unset>\t<quota unset>") {
+		t.Fatalf("picker rows = %q, want visible incomplete row", picker.rows)
 	}
-	if !strings.Contains(pickerInput, "example-dev\tuser@example.com\texample-project\texample-quota") {
-		t.Fatalf("picker input = %q, want complete row", pickerInput)
+	if !slices.Contains(picker.rows, "example-dev\tuser@example.com\texample-project\texample-quota") {
+		t.Fatalf("picker rows = %q, want complete row", picker.rows)
 	}
 	listCalls := 0
 	for _, call := range runner.calls {
@@ -595,26 +706,58 @@ func TestSelectAndSwitchUsesFZFAndStrictSwitchPath(t *testing.T) {
 func TestSelectAndSwitchTreatsFZFCancellationAsNoOp(t *testing.T) {
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 	t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
-	for _, code := range []int{1, 130} {
-		t.Run(strconv.Itoa(code), func(t *testing.T) {
-			runner := &fakeRunner{handler: func(name string, _ []string, _ io.Reader, stdout, _ io.Writer) error {
-				if name == "gcloud" {
-					_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, "user@example.com", "example-project", "example-quota"))
-					return nil
-				}
-				return fakeExitError{code: code}
-			}}
-			manager := newManager(runner, nil, io.Discard, io.Discard)
+	runner := &fakeRunner{handler: func(name string, _ []string, _ io.Reader, stdout, _ io.Writer) error {
+		if name != "gcloud" {
+			t.Fatalf("external command = %q, want only gcloud", name)
+		}
+		_, _ = io.WriteString(
+			stdout,
+			configurationJSON("user@example.com", "example-project", "example-quota"),
+		)
+		return nil
+	}}
+	manager := newManagerWithPicker(
+		runner,
+		&fakePicker{err: ErrSelectionCanceled},
+		nil,
+		io.Discard,
+		io.Discard,
+	)
 
-			_, err := manager.SelectAndSwitch(context.Background())
+	_, err := manager.SelectAndSwitch(t.Context())
 
-			if !errors.Is(err, ErrSelectionCanceled) {
-				t.Fatalf("error = %v, want ErrSelectionCanceled", err)
-			}
-			if len(runner.calls) != 2 {
-				t.Fatalf("calls = %#v, want list and fzf only", runner.calls)
-			}
-		})
+	if !errors.Is(err, ErrSelectionCanceled) {
+		t.Fatalf("error = %v, want ErrSelectionCanceled", err)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("calls = %#v, want only configuration discovery", runner.calls)
+	}
+}
+
+func TestSelectAndSwitchPreservesInterruptedContext(t *testing.T) {
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+	t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
+	runner := &fakeRunner{handler: func(_ string, _ []string, _ io.Reader, stdout, _ io.Writer) error {
+		_, _ = io.WriteString(
+			stdout,
+			configurationJSON("user@example.com", "example-project", "example-quota"),
+		)
+		return nil
+	}}
+	manager := newManagerWithPicker(
+		runner,
+		&fakePicker{err: ErrSelectionCanceled},
+		nil,
+		io.Discard,
+		io.Discard,
+	)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := manager.SelectAndSwitch(ctx)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
 	}
 }
 
@@ -633,8 +776,20 @@ func TestSwitchPreviousTogglesLikeKubectx(t *testing.T) {
 			switch args[2] {
 			case "list":
 				_, _ = io.WriteString(stdout, "["+
-					configurationObject("example-old", active == "example-old", "old@example.com", "old-project", "old-quota")+","+
-					configurationObject("example-dev", active == "example-dev", "user@example.com", "example-project", "example-quota")+"]")
+					configurationObject(
+						"example-old",
+						active == "example-old",
+						"old@example.com",
+						"old-project",
+						"old-quota",
+					)+","+
+					configurationObject(
+						"example-dev",
+						active == "example-dev",
+						"user@example.com",
+						"example-project",
+						"example-quota",
+					)+"]")
 			case "activate":
 				active = args[3]
 			}
@@ -647,9 +802,9 @@ func TestSwitchPreviousTogglesLikeKubectx(t *testing.T) {
 		}
 		return nil
 	}}
-	manager := newManager(runner, nil, io.Discard, io.Discard)
+	manager := newManager(runner, io.Discard, io.Discard)
 
-	first, err := manager.SwitchPrevious(context.Background())
+	first, err := manager.SwitchPrevious(t.Context())
 	if err != nil {
 		t.Fatalf("first SwitchPrevious() error = %v", err)
 	}
@@ -658,7 +813,7 @@ func TestSwitchPreviousTogglesLikeKubectx(t *testing.T) {
 	}
 	assertPreviousState(t, statePath, "example-dev")
 
-	second, err := manager.SwitchPrevious(context.Background())
+	second, err := manager.SwitchPrevious(t.Context())
 	if err != nil {
 		t.Fatalf("second SwitchPrevious() error = %v", err)
 	}
@@ -673,8 +828,8 @@ func TestSwitchPreviousRejectsMissingOrCorruptState(t *testing.T) {
 	t.Setenv("CLOUDSDK_ACTIVE_CONFIG_NAME", "")
 	for name, contents := range map[string]*[]byte{
 		"missing": nil,
-		"corrupt": pointerTo([]byte("not-json")),
-		"empty":   pointerTo([]byte("{\"previous\":\"\"}")),
+		"corrupt": new([]byte("not-json")),
+		"empty":   new([]byte("{\"previous\":\"\"}")),
 	} {
 		t.Run(name, func(t *testing.T) {
 			directory := t.TempDir()
@@ -686,15 +841,18 @@ func TestSwitchPreviousRejectsMissingOrCorruptState(t *testing.T) {
 			runner := &fakeRunner{handler: func(_ string, args []string, _ io.Reader, stdout, _ io.Writer) error {
 				switch args[0] {
 				case "config":
-					_, _ = io.WriteString(stdout, configurationJSON("example-dev", true, "user@example.com", "example-project", "example-quota"))
+					_, _ = io.WriteString(
+						stdout,
+						configurationJSON("user@example.com", "example-project", "example-quota"),
+					)
 				case "info":
 					_, _ = io.WriteString(stdout, directory)
 				}
 				return nil
 			}}
-			manager := newManager(runner, nil, io.Discard, io.Discard)
+			manager := newManager(runner, io.Discard, io.Discard)
 
-			_, err := manager.SwitchPrevious(context.Background())
+			_, err := manager.SwitchPrevious(t.Context())
 
 			if err == nil || !strings.Contains(err.Error(), "previous") {
 				t.Fatalf("error = %v, want previous-context error", err)
@@ -717,10 +875,6 @@ func assertPreviousState(t *testing.T, path, want string) {
 	}
 }
 
-func pointerTo[T any](value T) *T {
-	return &value
-}
-
 func assertCalls(t *testing.T, got []recordedCall, want [][]string) {
 	t.Helper()
 	if len(got) != len(want) {
@@ -733,8 +887,8 @@ func assertCalls(t *testing.T, got []recordedCall, want [][]string) {
 	}
 }
 
-func configurationJSON(name string, active bool, account, project, quota string) string {
-	return "[" + configurationObject(name, active, account, project, quota) + "]"
+func configurationJSON(account, project, quota string) string {
+	return "[" + configurationObject("example-dev", true, account, project, quota) + "]"
 }
 
 func configurationObject(name string, active bool, account, project, quota string) string {

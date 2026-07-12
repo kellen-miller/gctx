@@ -39,20 +39,20 @@ reauthentication.
 
 - macOS or Linux
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
-- [fzf](https://github.com/junegunn/fzf) for interactive selection
 - Go 1.26 or newer when installing from source
 
-`fzf` is optional when using `gctx CONFIGURATION`, `gctx --current`, or
-`gctx -`.
+The interactive fuzzy finder is embedded in the `gctx` binary, so a separate
+`fzf` installation is not required.
 
 ## Install
 
 ```sh
-go install github.com/kellen-miller/gctx@latest
+go install github.com/kellen-miller/gctx/cmd/gctx@latest
 ```
 
 Make sure `$(go env GOPATH)/bin` is on `PATH`. Before this initial change is
-merged, clone the repository and run `go install .` from the checkout instead.
+merged, clone the repository and run `go install ./cmd/gctx` from the checkout
+instead.
 
 ## Configure gcloud
 
@@ -205,7 +205,14 @@ go build -trimpath ./...
 ```
 
 Pull-request CI runs formatting, golangci-lint, govulncheck, actionlint, race
-tests, and builds on GitHub-hosted Ubuntu and macOS runners.
+tests, release-configuration validation, and builds on GitHub-hosted Ubuntu and
+macOS runners. Pull request titles must follow Conventional Commits because a
+squash merge becomes the commit analyzed for the next release.
+
+Merges to `main` run semantic-release. `feat` commits produce minor releases,
+`fix` and `perf` commits produce patch releases, and breaking changes produce
+major releases. GoReleaser adds macOS and Linux archives plus a checksum file
+to the generated GitHub release.
 
 ## Uninstall
 

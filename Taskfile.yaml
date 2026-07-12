@@ -41,7 +41,7 @@ tasks:
     desc: Build the command
     cmds:
       - mkdir -p dist
-      - go build -trimpath -o dist/gctx .
+      - go build -trimpath -o dist/gctx ./cmd/gctx
 
   check:
     desc: Run every local verification gate

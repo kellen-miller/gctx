@@ -11,7 +11,7 @@ import (
 func TestExecRunnerReturnsContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(25 * time.Millisecond)
 		cancel()

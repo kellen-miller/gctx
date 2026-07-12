@@ -1,7 +1,6 @@
 package gctx
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -41,7 +40,7 @@ esac
 	}
 	manager := NewManager(nil, io.Discard, io.Discard)
 
-	result, err := manager.Switch(context.Background(), "example-dev")
+	result, err := manager.Switch(t.Context(), "example-dev")
 
 	if err != nil {
 		t.Fatalf("Switch() error = %v", err)

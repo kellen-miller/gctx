@@ -51,7 +51,7 @@ func TestRunDispatchesAndPrintsSwitchSummary(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr=%q", code, stderr.String())
@@ -80,8 +80,20 @@ func TestRunDispatchesPublicForms(t *testing.T) {
 	}{
 		{name: "fuzzy", args: []string{"gctx"}, called: "select"},
 		{name: "previous", args: []string{"gctx", "-"}, called: "previous"},
-		{name: "current long", args: []string{"gctx", "--current"}, current: "example-dev", called: "current", stdout: "example-dev\n"},
-		{name: "current short", args: []string{"gctx", "-c"}, current: "example-dev", called: "current", stdout: "example-dev\n"},
+		{
+			name:    "current long",
+			args:    []string{"gctx", "--current"},
+			current: "example-dev",
+			called:  "current",
+			stdout:  "example-dev\n",
+		},
+		{
+			name:    "current short",
+			args:    []string{"gctx", "-c"},
+			current: "example-dev",
+			called:  "current",
+			stdout:  "example-dev\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,7 +102,7 @@ func TestRunDispatchesPublicForms(t *testing.T) {
 			useCases := &fakeContexts{current: tt.current}
 			var stdout, stderr bytes.Buffer
 
-			code := app.Run(context.Background(), tt.args, useCases, &stdout, &stderr, "test")
+			code := app.Run(t.Context(), tt.args, useCases, &stdout, &stderr, "test")
 
 			if code != 0 {
 				t.Fatalf("exit code = %d, want 0; stderr=%q", code, stderr.String())
@@ -115,7 +127,7 @@ func TestRunRejectsAmbiguousArguments(t *testing.T) {
 		useCases := &fakeContexts{}
 		var stdout, stderr bytes.Buffer
 
-		code := app.Run(context.Background(), args, useCases, &stdout, &stderr, "test")
+		code := app.Run(t.Context(), args, useCases, &stdout, &stderr, "test")
 
 		if code != 2 {
 			t.Fatalf("Run(%q) exit code = %d, want 2", args, code)
@@ -135,10 +147,23 @@ func TestRunTreatsSelectionCancellationAsSuccess(t *testing.T) {
 	useCases := &fakeContexts{err: gctx.ErrSelectionCanceled}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx"}, useCases, &stdout, &stderr, "test")
 
 	if code != 0 || stdout.Len() != 0 || stderr.Len() != 0 {
 		t.Fatalf("cancel result = (%d, %q, %q), want quiet success", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunTreatsInterruptedSelectionAsInterrupt(t *testing.T) {
+	t.Parallel()
+
+	useCases := &fakeContexts{err: errors.Join(gctx.ErrSelectionCanceled, context.Canceled)}
+	var stdout, stderr bytes.Buffer
+
+	code := app.Run(t.Context(), []string{"gctx"}, useCases, &stdout, &stderr, "test")
+
+	if code != 130 || stdout.Len() != 0 || stderr.Len() != 0 {
+		t.Fatalf("interrupt result = (%d, %q, %q), want quiet exit 130", code, stdout.String(), stderr.String())
 	}
 }
 
@@ -148,7 +173,7 @@ func TestRunReportsOperationError(t *testing.T) {
 	useCases := &fakeContexts{err: errors.New("native failure")}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
@@ -156,7 +181,7 @@ func TestRunReportsOperationError(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if stderr.String() != "gctx: native failure\n" {
+	if stderr.String() != "gctx: switch configuration: native failure\n" {
 		t.Fatalf("stderr = %q, want contextual error", stderr.String())
 	}
 }
@@ -173,7 +198,7 @@ func TestRunPrintsNonFatalSwitchWarning(t *testing.T) {
 	}}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx", "example-dev"}, useCases, &stdout, &stderr, "test")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -189,7 +214,7 @@ func TestRunAllowsConfigurationNamedHelp(t *testing.T) {
 	useCases := &fakeContexts{}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx", "help"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx", "help"}, useCases, &stdout, &stderr, "test")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr=%q", code, stderr.String())
@@ -205,7 +230,7 @@ func TestRunMapsUnknownFlagToUsageError(t *testing.T) {
 	useCases := &fakeContexts{}
 	var stdout, stderr bytes.Buffer
 
-	code := app.Run(context.Background(), []string{"gctx", "--bogus"}, useCases, &stdout, &stderr, "test")
+	code := app.Run(t.Context(), []string{"gctx", "--bogus"}, useCases, &stdout, &stderr, "test")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2; stderr=%q", code, stderr.String())
