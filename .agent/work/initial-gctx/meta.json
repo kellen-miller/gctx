@@ -1,0 +1,19 @@
+{
+    "id": "initial-gctx",
+    "title": "Initial gctx public CLI",
+    "stage": "implementation",
+    "state": "completed",
+    "created_at": "2026-07-12T14:54:43Z",
+    "updated_at": "2026-07-12T16:55:00Z",
+    "worktree": {
+        "path": "/Users/kellen/development/github/kellen-miller/gctx/.worktrees/initial-gctx",
+        "branch": "feat/initial-gctx",
+        "base_ref": "main",
+        "base_commit": "566642f",
+        "upstream": null
+    },
+    "artifacts": {
+        "decision": "decision.md",
+        "execplan": "execplan.md"
+    }
+}
