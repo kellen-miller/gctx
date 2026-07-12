@@ -1,0 +1,51 @@
+version: "3"
+
+vars:
+  ACTIONLINT_VERSION: v1.7.12
+  GOLANGCI_LINT_VERSION: v2.12.2
+  GOVULNCHECK_VERSION: v1.6.0
+  TOOLS_DIR: "{{.ROOT_DIR}}/.tools/bin"
+
+tasks:
+  tools:
+    desc: Install pinned developer tools outside the root module
+    cmds:
+      - mkdir -p "{{.TOOLS_DIR}}"
+      - GOBIN="{{.TOOLS_DIR}}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - GOBIN="{{.TOOLS_DIR}}" go install golang.org/x/vuln/cmd/govulncheck@{{.GOVULNCHECK_VERSION}}
+      - GOBIN="{{.TOOLS_DIR}}" go install github.com/rhysd/actionlint/cmd/actionlint@{{.ACTIONLINT_VERSION}}
+
+  fmt:
+    desc: Format Go source
+    cmds:
+      - gofmt -w .
+
+  lint:
+    desc: Run static and workflow checks
+    deps: [tools]
+    cmds:
+      - 'test -z "$(gofmt -l .)"'
+      - go vet ./...
+      - '"{{.TOOLS_DIR}}/golangci-lint" run'
+      - '"{{.TOOLS_DIR}}/govulncheck" ./...'
+      - '"{{.TOOLS_DIR}}/actionlint"'
+
+  test:
+    desc: Run tests with the race detector
+    env:
+      CGO_ENABLED: "1"
+    cmds:
+      - go test -race ./...
+
+  build:
+    desc: Build the command
+    cmds:
+      - mkdir -p dist
+      - go build -trimpath -o dist/gctx ./cmd/gctx
+
+  check:
+    desc: Run every local verification gate
+    cmds:
+      - task: lint
+      - task: test
+      - task: build

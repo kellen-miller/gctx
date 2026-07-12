@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Semantic release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Create semantic release
+        id: semantic_release
+        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve release tag
+        id: release_tag
+        env:
+          SEMANTIC_RELEASE_TAG: ${{ steps.semantic_release.outputs.new_release_git_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          tag="${SEMANTIC_RELEASE_TAG}"
+          if [[ -z "${tag}" ]]; then
+            tag="$(git tag --points-at HEAD --list 'v*' --sort=-version:refname | head -n 1)"
+          fi
+          if [[ -n "${tag}" && "$(git rev-list -n 1 "${tag}")" != "${GITHUB_SHA}" ]]; then
+            echo "Release tag ${tag} does not point at ${GITHUB_SHA}" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+      - name: Publish release archives
+        if: steps.release_tag.outputs.tag != ''
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
