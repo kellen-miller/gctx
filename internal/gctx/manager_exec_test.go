@@ -55,7 +55,7 @@ esac
 	wantLines := []string{
 		"config configurations list --format=" + configurationFormat,
 		"info --format=value(config.paths.global_config_dir)",
-		"auth login user@example.com --brief --no-activate --update-adc --configuration=example-dev",
+		"auth login user@example.com --brief --no-activate --update-adc --verbosity=error --configuration=example-dev",
 		"auth application-default set-quota-project example-quota --configuration=example-dev",
 		"config configurations activate example-dev --quiet",
 	}

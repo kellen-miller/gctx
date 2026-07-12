@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,12 +24,14 @@ type fakeRunner struct {
 }
 
 type fakePicker struct {
+	labels    string
 	rows      []string
 	selection string
 	err       error
 }
 
-func (picker *fakePicker) pick(_ context.Context, rows []string) (string, error) {
+func (picker *fakePicker) pick(_ context.Context, labels string, rows []string) (string, error) {
+	picker.labels = labels
 	picker.rows = slices.Clone(rows)
 	return picker.selection, picker.err
 }
@@ -140,6 +143,7 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 					"--brief",
 					"--no-activate",
 					"--update-adc",
+					"--verbosity=error",
 					"--configuration=example-dev",
 				},
 			) {
@@ -182,6 +186,7 @@ func TestSwitchSynchronizesADCBeforeActivation(t *testing.T) {
 			"--brief",
 			"--no-activate",
 			"--update-adc",
+			"--verbosity=error",
 			"--configuration=example-dev",
 		},
 		{"auth", "application-default", "set-quota-project", "example-quota", "--configuration=example-dev"},
@@ -675,7 +680,7 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 		}
 		return nil
 	}}
-	picker := &fakePicker{selection: "example-dev\tuser@example.com\texample-project\texample-quota"}
+	picker := &fakePicker{selection: "example-dev"}
 	manager := newManagerWithPicker(runner, picker, strings.NewReader(""), io.Discard, io.Discard)
 
 	result, err := manager.SelectAndSwitch(t.Context())
@@ -686,11 +691,46 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 	if result.Name != "example-dev" {
 		t.Fatalf("result = %#v", result)
 	}
-	if !slices.Contains(picker.rows, "incomplete\t<account unset>\t<project unset>\t<quota unset>") {
-		t.Fatalf("picker rows = %q, want visible incomplete row", picker.rows)
+	wantLabels := fmt.Sprintf(
+		"%-13s  %-16s  %-15s  %s",
+		"CONFIGURATION",
+		"ACCOUNT",
+		"PROJECT",
+		"QUOTA PROJECT",
+	)
+	if picker.labels != wantLabels {
+		t.Fatalf("picker labels = %q, want %q", picker.labels, wantLabels)
 	}
-	if !slices.Contains(picker.rows, "example-dev\tuser@example.com\texample-project\texample-quota") {
-		t.Fatalf("picker rows = %q, want complete row", picker.rows)
+	for _, row := range picker.rows {
+		if strings.Count(row, "\t") != 1 {
+			t.Fatalf("picker row = %q, want one hidden-key delimiter", row)
+		}
+	}
+	wantRows := []string{
+		"incomplete\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"incomplete",
+			"<account unset>",
+			"<project unset>",
+			"<quota unset>",
+		),
+		"example-old\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"example-old",
+			"old@example.com",
+			"old-project",
+			"old-quota",
+		),
+		"example-dev\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"example-dev",
+			"user@example.com",
+			"example-project",
+			"example-quota",
+		),
+	}
+	if !slices.Equal(picker.rows, wantRows) {
+		t.Fatalf("picker rows = %q, want aligned rows %q", picker.rows, wantRows)
 	}
 	listCalls := 0
 	for _, call := range runner.calls {
