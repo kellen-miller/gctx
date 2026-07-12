@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	basePickerOptionCount    = 6
+	basePickerOptionCount    = 7
 	additionalOutputCapacity = 2
 )
 
@@ -35,6 +35,7 @@ func (picker fzfPicker) pick(ctx context.Context, labels string, rows []string) 
 		"--with-nth=2",
 		"--accept-nth=1",
 		"--header="+labels,
+		"--header-border=line",
 		"--prompt=gctx> ",
 		"--no-multi",
 	)

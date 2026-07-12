@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	fzf "github.com/junegunn/fzf/src"
+	"github.com/junegunn/fzf/src/tui"
 )
 
 func TestEmbeddedFZFSelectsMatchingConfiguration(t *testing.T) {
@@ -44,6 +45,21 @@ func TestEmbeddedFZFUsesFixedLabelsBelowList(t *testing.T) {
 	}}
 
 	_, err := picker.pick(t.Context(), labels, []string{"example-dev"})
+
+	if !errors.Is(err, ErrSelectionCanceled) {
+		t.Fatalf("pick() error = %v, want ErrSelectionCanceled", err)
+	}
+}
+
+func TestEmbeddedFZFSeparatesLabelsFromList(t *testing.T) {
+	picker := fzfPicker{run: func(options *fzf.Options) (int, error) {
+		if options.HeaderBorderShape != tui.BorderLine {
+			t.Fatalf("header border = %v, want line", options.HeaderBorderShape)
+		}
+		return fzf.ExitNoMatch, nil
+	}}
+
+	_, err := picker.pick(t.Context(), "CONFIGURATION", []string{"example-dev"})
 
 	if !errors.Is(err, ErrSelectionCanceled) {
 		t.Fatalf("pick() error = %v, want ErrSelectionCanceled", err)
