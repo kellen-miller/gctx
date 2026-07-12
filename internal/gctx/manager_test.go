@@ -24,14 +24,14 @@ type fakeRunner struct {
 }
 
 type fakePicker struct {
-	footer    string
+	labels    string
 	rows      []string
 	selection string
 	err       error
 }
 
-func (picker *fakePicker) pick(_ context.Context, footer string, rows []string) (string, error) {
-	picker.footer = footer
+func (picker *fakePicker) pick(_ context.Context, labels string, rows []string) (string, error) {
+	picker.labels = labels
 	picker.rows = slices.Clone(rows)
 	return picker.selection, picker.err
 }
@@ -691,15 +691,15 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 	if result.Name != "example-dev" {
 		t.Fatalf("result = %#v", result)
 	}
-	wantFooter := fmt.Sprintf(
+	wantLabels := fmt.Sprintf(
 		"%-13s  %-16s  %-15s  %s",
 		"CONFIGURATION",
 		"ACCOUNT",
 		"PROJECT",
 		"QUOTA PROJECT",
 	)
-	if picker.footer != wantFooter {
-		t.Fatalf("picker footer = %q, want %q", picker.footer, wantFooter)
+	if picker.labels != wantLabels {
+		t.Fatalf("picker labels = %q, want %q", picker.labels, wantLabels)
 	}
 	for _, row := range picker.rows {
 		if strings.Count(row, "\t") != 1 {

@@ -15,7 +15,7 @@ const (
 )
 
 type contextPicker interface {
-	pick(ctx context.Context, footer string, rows []string) (string, error)
+	pick(ctx context.Context, labels string, rows []string) (string, error)
 }
 
 type fzfPicker struct {
@@ -23,7 +23,7 @@ type fzfPicker struct {
 	options []string
 }
 
-func (picker fzfPicker) pick(ctx context.Context, footer string, rows []string) (string, error) {
+func (picker fzfPicker) pick(ctx context.Context, labels string, rows []string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", fmt.Errorf("picker context: %w", err)
 	}
@@ -34,7 +34,7 @@ func (picker fzfPicker) pick(ctx context.Context, footer string, rows []string) 
 		"--delimiter=\t",
 		"--with-nth=2",
 		"--accept-nth=1",
-		"--footer="+footer,
+		"--header="+labels,
 		"--prompt=gctx> ",
 		"--no-multi",
 	)

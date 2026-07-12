@@ -124,8 +124,8 @@ func (manager *Manager) SelectAndSwitch(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	footer, rows := formatConfigurationTable(configurations)
-	selected, err := manager.picker.pick(ctx, footer, rows)
+	labels, rows := formatConfigurationTable(configurations)
+	selected, err := manager.picker.pick(ctx, labels, rows)
 	if err != nil {
 		if errors.Is(err, ErrSelectionCanceled) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
@@ -170,7 +170,7 @@ func formatConfigurationTable(configurations []configuration) (string, []string)
 			valueOr(candidate.Properties.Billing.QuotaProject, "<quota unset>"),
 		))
 	}
-	footer := fmt.Sprintf(
+	labels := fmt.Sprintf(
 		"%-*s  %-*s  %-*s  %s",
 		nameWidth,
 		configurationLabel,
@@ -180,7 +180,7 @@ func formatConfigurationTable(configurations []configuration) (string, []string)
 		projectLabel,
 		quotaProjectLabel,
 	)
-	return footer, rows
+	return labels, rows
 }
 
 func valueOr(value, fallback string) string {

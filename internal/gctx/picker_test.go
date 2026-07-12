@@ -31,16 +31,19 @@ func TestEmbeddedFZFSelectsMatchingConfiguration(t *testing.T) {
 	}
 }
 
-func TestEmbeddedFZFUsesFixedFooter(t *testing.T) {
-	footer := "CONFIGURATION  ACCOUNT  PROJECT  QUOTA PROJECT"
+func TestEmbeddedFZFUsesFixedLabelsBelowList(t *testing.T) {
+	labels := "CONFIGURATION  ACCOUNT  PROJECT  QUOTA PROJECT"
 	picker := fzfPicker{run: func(options *fzf.Options) (int, error) {
-		if !slices.Equal(options.Footer, []string{footer}) {
-			t.Fatalf("footer = %q, want %q", options.Footer, footer)
+		if !slices.Equal(options.Header, []string{labels}) {
+			t.Fatalf("header = %q, want %q", options.Header, labels)
+		}
+		if len(options.Footer) != 0 {
+			t.Fatalf("footer = %q, want no footer", options.Footer)
 		}
 		return fzf.ExitNoMatch, nil
 	}}
 
-	_, err := picker.pick(t.Context(), footer, []string{"example-dev"})
+	_, err := picker.pick(t.Context(), labels, []string{"example-dev"})
 
 	if !errors.Is(err, ErrSelectionCanceled) {
 		t.Fatalf("pick() error = %v, want ErrSelectionCanceled", err)
