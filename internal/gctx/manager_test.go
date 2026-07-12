@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,12 +24,14 @@ type fakeRunner struct {
 }
 
 type fakePicker struct {
+	footer    string
 	rows      []string
 	selection string
 	err       error
 }
 
-func (picker *fakePicker) pick(_ context.Context, rows []string) (string, error) {
+func (picker *fakePicker) pick(_ context.Context, footer string, rows []string) (string, error) {
+	picker.footer = footer
 	picker.rows = slices.Clone(rows)
 	return picker.selection, picker.err
 }
@@ -688,15 +691,43 @@ func TestSelectAndSwitchUsesEmbeddedFZFAndStrictSwitchPath(t *testing.T) {
 	if result.Name != "example-dev" {
 		t.Fatalf("result = %#v", result)
 	}
+	wantFooter := fmt.Sprintf(
+		"%-13s  %-16s  %-15s  %s",
+		"CONFIGURATION",
+		"ACCOUNT",
+		"PROJECT",
+		"QUOTA PROJECT",
+	)
+	if picker.footer != wantFooter {
+		t.Fatalf("picker footer = %q, want %q", picker.footer, wantFooter)
+	}
 	for _, row := range picker.rows {
 		if strings.Count(row, "\t") != 1 {
 			t.Fatalf("picker row = %q, want one hidden-key delimiter", row)
 		}
 	}
 	wantRows := []string{
-		"incomplete\tincomplete   <account unset>   <project unset>  <quota unset>",
-		"example-old\texample-old  old@example.com   old-project      old-quota",
-		"example-dev\texample-dev  user@example.com  example-project  example-quota",
+		"incomplete\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"incomplete",
+			"<account unset>",
+			"<project unset>",
+			"<quota unset>",
+		),
+		"example-old\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"example-old",
+			"old@example.com",
+			"old-project",
+			"old-quota",
+		),
+		"example-dev\t" + fmt.Sprintf(
+			"%-13s  %-16s  %-15s  %s",
+			"example-dev",
+			"user@example.com",
+			"example-project",
+			"example-quota",
+		),
 	}
 	if !slices.Equal(picker.rows, wantRows) {
 		t.Fatalf("picker rows = %q, want aligned rows %q", picker.rows, wantRows)

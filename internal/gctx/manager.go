@@ -28,6 +28,10 @@ const (
 	verbosityErrorFlag         = "--verbosity=error"
 	quietFlag                  = "--quiet"
 	cleanupTimeout             = 15 * time.Second
+	configurationLabel         = "CONFIGURATION"
+	accountLabel               = "ACCOUNT"
+	projectLabel               = "PROJECT"
+	quotaProjectLabel          = "QUOTA PROJECT"
 )
 
 // Manager owns complete Google Cloud context operations.
@@ -120,8 +124,8 @@ func (manager *Manager) SelectAndSwitch(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	rows := formatConfigurationRows(configurations)
-	selected, err := manager.picker.pick(ctx, rows)
+	footer, rows := formatConfigurationTable(configurations)
+	selected, err := manager.picker.pick(ctx, footer, rows)
 	if err != nil {
 		if errors.Is(err, ErrSelectionCanceled) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
@@ -142,8 +146,10 @@ func (manager *Manager) SelectAndSwitch(ctx context.Context) (Result, error) {
 	return manager.switchConfiguration(ctx, configurations, name)
 }
 
-func formatConfigurationRows(configurations []configuration) []string {
-	nameWidth, accountWidth, projectWidth := 0, 0, 0
+func formatConfigurationTable(configurations []configuration) (string, []string) {
+	nameWidth := len(configurationLabel)
+	accountWidth := len(accountLabel)
+	projectWidth := len(projectLabel)
 	for _, candidate := range configurations {
 		nameWidth = max(nameWidth, len(candidate.Name))
 		accountWidth = max(accountWidth, len(valueOr(candidate.Properties.Core.Account, "<account unset>")))
@@ -164,7 +170,17 @@ func formatConfigurationRows(configurations []configuration) []string {
 			valueOr(candidate.Properties.Billing.QuotaProject, "<quota unset>"),
 		))
 	}
-	return rows
+	footer := fmt.Sprintf(
+		"%-*s  %-*s  %-*s  %s",
+		nameWidth,
+		configurationLabel,
+		accountWidth,
+		accountLabel,
+		projectWidth,
+		projectLabel,
+		quotaProjectLabel,
+	)
+	return footer, rows
 }
 
 func valueOr(value, fallback string) string {

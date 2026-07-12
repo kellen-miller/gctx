@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	basePickerOptionCount    = 5
+	basePickerOptionCount    = 6
 	additionalOutputCapacity = 2
 )
 
 type contextPicker interface {
-	pick(ctx context.Context, rows []string) (string, error)
+	pick(ctx context.Context, footer string, rows []string) (string, error)
 }
 
 type fzfPicker struct {
@@ -23,7 +23,7 @@ type fzfPicker struct {
 	options []string
 }
 
-func (picker fzfPicker) pick(ctx context.Context, rows []string) (string, error) {
+func (picker fzfPicker) pick(ctx context.Context, footer string, rows []string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", fmt.Errorf("picker context: %w", err)
 	}
@@ -34,6 +34,7 @@ func (picker fzfPicker) pick(ctx context.Context, rows []string) (string, error)
 		"--delimiter=\t",
 		"--with-nth=2",
 		"--accept-nth=1",
+		"--footer="+footer,
 		"--prompt=gctx> ",
 		"--no-multi",
 	)
