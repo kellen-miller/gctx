@@ -1,1 +1,6 @@
+.agent/
+.tools/
 .worktrees/
+coverage.out
+dist/
+/gctx
