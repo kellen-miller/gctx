@@ -1,0 +1,11 @@
+name: Shared CI
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: shared-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  renovate:
+    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@d1c91763535a5866b55282018f301d921b22bcd5
