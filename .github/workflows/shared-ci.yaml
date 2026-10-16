@@ -8,4 +8,4 @@ concurrency:
   cancel-in-progress: true
 jobs:
   renovate:
-    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@e3badfe2c992d394f4f177e7f535561a0388ea91
+    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@730a37faa538048765e3cbb2e9b1454cfc4eb722
