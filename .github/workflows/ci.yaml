@@ -11,7 +11,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.paths.outputs.changes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: paths
+        uses: kellen-miller/ci/.github/actions/changed-paths@75c70f9d5db7117810669e0af01fd2eafdc396c6
+        with:
+          filters: |
+            {
+              "go": [
+                ".github/workflows/**",
+                ".github/actions/**",
+                "go.mod",
+                "go.sum",
+                "go.work",
+                "go.work.sum",
+                "**/*.go",
+                "cmd/**",
+                "internal/**",
+                "pkg/**",
+                "testdata/**",
+                "fixtures/**",
+                "scripts/**",
+                ".golangci*",
+                "Taskfile*",
+                "Makefile"
+              ],
+              "release": [
+                ".github/workflows/**",
+                ".github/actions/**",
+                "go.mod",
+                "go.sum",
+                "go.work",
+                "go.work.sum",
+                "**/*.go",
+                "cmd/**",
+                "internal/**",
+                "pkg/**",
+                "testdata/**",
+                "fixtures/**",
+                "scripts/**",
+                ".golangci*",
+                "Taskfile*",
+                "Makefile",
+                "release.config.cjs",
+                ".goreleaser*",
+                "package*.json",
+                "LICENSE",
+                "README.md"
+              ]
+            }
+
   go-lint:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
     name: Go lint
     runs-on: ubuntu-latest
     steps:
@@ -25,6 +84,8 @@ jobs:
           vulnerability-check: 'false'
 
   govulncheck:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
     name: Go vulnerability check
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +97,7 @@ jobs:
 
   github-actions-lint:
     name: GitHub Actions lint
-    uses: kellen-miller/ci/.github/workflows/gh-actions-lint.yaml@d1c91763535a5866b55282018f301d921b22bcd5
+    uses: kellen-miller/ci/.github/workflows/gh-actions-lint.yaml@75c70f9d5db7117810669e0af01fd2eafdc396c6
 
   pull-request-title:
     name: Conventional pull request title
@@ -63,6 +124,8 @@ jobs:
             revert
 
   release-config:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).release) }}
     name: Release configuration
     runs-on: ubuntu-latest
     steps:
@@ -82,6 +145,8 @@ jobs:
           args: check
 
   test:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
     name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -95,6 +160,8 @@ jobs:
       go-version-file: go.mod
 
   build:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
