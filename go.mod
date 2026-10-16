@@ -3,7 +3,7 @@ module github.com/kellen-miller/gctx
 go 1.26
 
 require (
-	github.com/junegunn/fzf v0.74.4
+	github.com/junegunn/fzf v0.74.5
 	github.com/urfave/cli/v3 v3.14.0
 )
 
