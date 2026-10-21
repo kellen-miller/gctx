@@ -77,10 +77,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: kellen-miller/ci/.github/actions/go-lint@d1c91763535a5866b55282018f301d921b22bcd5
+      - uses: kellen-miller/ci/.github/actions/go-lint@9478f2f23f217048a86cb1916fb78b312f20afa7
         with:
           go-version-file: go.mod
-          golangci-lint-version: v2.12.2
           vulnerability-check: 'false'
 
   govulncheck:
