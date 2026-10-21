@@ -316,24 +316,26 @@ func (manager *Manager) synchronizeAndActivate(
 		verbosityErrorFlag,
 		configurationFlag,
 	}
-	if err := manager.runner.run(
+	runErr := manager.runner.run(
 		ctx,
 		gcloudCommand,
 		loginArgs,
 		manager.stdin,
 		manager.stdout,
 		manager.stderr,
-	); err != nil {
-		return rollback(fmt.Errorf("authenticate %s and update ADC: %w", target.Properties.Core.Account, err))
+	)
+	if runErr != nil {
+		return rollback(fmt.Errorf("authenticate %s and update ADC: %w", target.Properties.Core.Account, runErr))
 	}
-	if _, err := manager.capture(ctx, []string{
+	_, captureErr := manager.capture(ctx, []string{
 		authArgument,
 		applicationDefaultArgument,
 		setQuotaProjectArgument,
 		target.Properties.Billing.QuotaProject,
 		configurationFlag,
-	}); err != nil {
-		return rollback(fmt.Errorf("set ADC quota project %s: %w", target.Properties.Billing.QuotaProject, err))
+	})
+	if captureErr != nil {
+		return rollback(fmt.Errorf("set ADC quota project %s: %w", target.Properties.Billing.QuotaProject, captureErr))
 	}
 	if _, err := manager.capture(ctx, activationArguments(target.Name)); err != nil {
 		return manager.rollbackActivation(ctx, current.Name, target.Name, err, rollback)

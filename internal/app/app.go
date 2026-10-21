@@ -63,8 +63,7 @@ func Run(ctx context.Context, args []string, useCases contexts, stdout, stderr i
 	}
 
 	code := exitFailure
-	var exitCoder cli.ExitCoder
-	if errors.As(err, &exitCoder) {
+	if exitCoder, ok := errors.AsType[cli.ExitCoder](err); ok {
 		code = exitCoder.ExitCode()
 	}
 	if _, printErr := fmt.Fprintf(stderr, "gctx: %v\n", err); printErr != nil {
@@ -82,7 +81,7 @@ func runAction(
 ) error {
 	arguments := command.Args()
 	if arguments.Len() > 1 || (command.Bool("current") && arguments.Present()) {
-		return cli.Exit("usage: gctx [--current | CONFIGURATION | -]", exitUsage)
+		return fmt.Errorf("%w", cli.Exit("usage: gctx [--current | CONFIGURATION | -]", exitUsage))
 	}
 
 	if command.Bool("current") {
