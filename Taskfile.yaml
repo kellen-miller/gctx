@@ -2,7 +2,7 @@ version: "3"
 
 vars:
   ACTIONLINT_VERSION: v1.7.12
-  GOLANGCI_LINT_VERSION: v2.12.2
+  GOLANGCI_LINT_VERSION: v2.15.0
   GOVULNCHECK_VERSION: v1.6.0
   TOOLS_DIR: "{{.ROOT_DIR}}/.tools/bin"
 
@@ -16,17 +16,22 @@ tasks:
       - GOBIN="{{.TOOLS_DIR}}" go install github.com/rhysd/actionlint/cmd/actionlint@{{.ACTIONLINT_VERSION}}
 
   fmt:
-    desc: Format Go source
+    desc: Format Go source with shared CI policy
+    deps: [tools]
+    requires:
+      vars: [CI_POLICY_REPO]
     cmds:
-      - gofmt -w .
+      - '"{{.TOOLS_DIR}}/golangci-lint" fmt --config "{{.CI_POLICY_REPO}}/config/golangci.yaml"'
 
   lint:
     desc: Run static and workflow checks
     deps: [tools]
+    requires:
+      vars: [CI_POLICY_REPO]
     cmds:
-      - 'test -z "$(gofmt -l .)"'
+      - 'PATH="{{.TOOLS_DIR}}:$PATH" LINT_CONFIG="{{.CI_POLICY_REPO}}/config/golangci.yaml" bash "{{.CI_POLICY_REPO}}/.github/actions/go-lint/format.sh"'
       - go vet ./...
-      - '"{{.TOOLS_DIR}}/golangci-lint" run'
+      - '"{{.TOOLS_DIR}}/golangci-lint" run --config "{{.CI_POLICY_REPO}}/config/golangci.yaml"'
       - '"{{.TOOLS_DIR}}/govulncheck" ./...'
       - '"{{.TOOLS_DIR}}/actionlint"'
 

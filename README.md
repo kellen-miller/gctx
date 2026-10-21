@@ -189,16 +189,25 @@ Never print or copy the ADC JSON into logs; it contains credentials.
 ## Develop
 
 The root module contains only runtime dependencies. Pinned developer tools are
-installed under the ignored `.tools` directory.
+installed under the ignored `.tools` directory. Formatting and linting use the
+same policy revision as CI. Prepare a separate policy checkout once:
 
 ```sh
+git clone https://github.com/kellen-miller/ci.git ../ci-policy
+git -C ../ci-policy checkout --detach 9478f2f23f217048a86cb1916fb78b312f20afa7
+export CI_POLICY_REPO="$(cd ../ci-policy && pwd)"
 task check
 ```
 
-Equivalent core commands are:
+`task fmt` also requires `CI_POLICY_REPO`. Neither task fetches or updates the
+policy checkout. Keep it at the pinned revision above for CI parity.
+
+Equivalent core commands after `task tools` are:
 
 ```sh
-test -z "$(gofmt -l .)"
+PATH="$PWD/.tools/bin:$PATH" LINT_CONFIG="$CI_POLICY_REPO/config/golangci.yaml" \
+  bash "$CI_POLICY_REPO/.github/actions/go-lint/format.sh"
+.tools/bin/golangci-lint run --config "$CI_POLICY_REPO/config/golangci.yaml"
 go vet ./...
 go test -race ./...
 go build -trimpath ./...
