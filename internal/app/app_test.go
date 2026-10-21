@@ -135,7 +135,7 @@ func TestRunRejectsAmbiguousArguments(t *testing.T) {
 		if useCases.called != "" {
 			t.Fatalf("Run(%q) dispatched %q, want no operation", args, useCases.called)
 		}
-		if !strings.Contains(stderr.String(), "usage") {
+		if !strings.Contains(stderr.String(), "parse command arguments: usage") {
 			t.Fatalf("Run(%q) stderr = %q, want usage error", args, stderr.String())
 		}
 	}

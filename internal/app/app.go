@@ -81,7 +81,10 @@ func runAction(
 ) error {
 	arguments := command.Args()
 	if arguments.Len() > 1 || (command.Bool("current") && arguments.Present()) {
-		return fmt.Errorf("%w", cli.Exit("usage: gctx [--current | CONFIGURATION | -]", exitUsage))
+		return fmt.Errorf(
+			"parse command arguments: %w",
+			cli.Exit("usage: gctx [--current | CONFIGURATION | -]", exitUsage),
+		)
 	}
 
 	if command.Bool("current") {
