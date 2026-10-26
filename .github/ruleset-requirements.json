@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "Build (macos-latest)",
+    "Build (ubuntu-latest)",
+    "Conventional pull request title",
+    "GitHub Actions / Workflow validation",
+    "Go lint",
+    "Go vulnerability check",
+    "Release configuration",
+    "Test (macos-latest) / Go Test",
+    "Test (ubuntu-latest) / Go Test",
+    "Renovate / Config validation",
+    "Code duplication (CPD)"
+  ]
+}

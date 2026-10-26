@@ -95,8 +95,8 @@ jobs:
           go-package: ./...
 
   github-actions-lint:
-    name: GitHub Actions lint
-    uses: kellen-miller/ci/.github/workflows/gh-actions-lint.yaml@6d83b6c0e8b6f407fa2f11e1c974449649cfa1f6
+    name: GitHub Actions
+    uses: kellen-miller/ci/.github/workflows/gh-actions-lint.yaml@eb1a4f5900aaa6468cffb67513da61078265ba26
 
   pull-request-title:
     name: Conventional pull request title

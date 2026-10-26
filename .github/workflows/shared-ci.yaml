@@ -8,4 +8,16 @@ concurrency:
   cancel-in-progress: true
 jobs:
   renovate:
-    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@6d83b6c0e8b6f407fa2f11e1c974449649cfa1f6
+    name: Renovate
+    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@eb1a4f5900aaa6468cffb67513da61078265ba26
+
+  duplication:
+    name: Code duplication (CPD)
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: kellen-miller/ci/.github/actions/code-duplication@eb1a4f5900aaa6468cffb67513da61078265ba26
