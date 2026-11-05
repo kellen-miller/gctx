@@ -10,6 +10,6 @@
     "Go / Package tests (macos-latest)",
     "Go / Package tests (ubuntu-latest)",
     "Renovate / Config validation",
-    "Code duplication / Source analysis"
+    "Code duplication / JSCPD scan"
   ]
 }
