@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   gctx-paths:
-    name: gctx / Changed paths
+    name: Changed paths
     runs-on: ubuntu-latest
     outputs:
       changes: ${{ steps.paths.outputs.changes }}

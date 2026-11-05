@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   title-validation:
-    name: Pull request / Title validation
+    name: Title validation
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
