@@ -7,8 +7,8 @@
     "Go / Static analysis",
     "Go / Vulnerability analysis",
     "Release / Configuration validation",
-    "Go / Package tests (macos-latest)",
-    "Go / Package tests (ubuntu-latest)",
+    "Go (macos-latest) / Package tests",
+    "Go (ubuntu-latest) / Package tests",
     "Renovate / Config validation",
     "Code duplication / JSCPD scan"
   ]

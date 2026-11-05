@@ -117,7 +117,7 @@ jobs:
           args: check
 
   go-package-tests:
-    name: Go
+    name: Go (${{ matrix.os }})
     needs: gctx-paths
     if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).go) }}
     strategy:
@@ -128,7 +128,7 @@ jobs:
           - macos-latest
     uses: kellen-miller/ci/.github/workflows/go-test.yaml@c188397b9147dbf21030cf2f3e4fc41bff37358b
     with:
-      check-name: Package tests (${{ matrix.os }})
+      check-name: Package tests
       runner: ${{ matrix.os }}
       go-version-file: go.mod
 
