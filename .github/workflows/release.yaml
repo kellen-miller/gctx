@@ -1,4 +1,4 @@
-name: Release
+name: gctx release
 
 on:
   push:
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Semantic release
+  publish-release:
+    name: Release / Publish CLI archives
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
