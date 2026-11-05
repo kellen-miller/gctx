@@ -3,13 +3,13 @@
     "Go / Build CLI (macos-latest)",
     "Go / Build CLI (ubuntu-latest)",
     "Title validation",
-    "GitHub Actions / Workflow validation",
+    ".github/workflows / Workflow validation",
     "Go / Static analysis",
     "Go / Vulnerability analysis",
     "Release / Configuration validation",
     "Go (macos-latest) / Package tests",
     "Go (ubuntu-latest) / Package tests",
-    "Renovate / Config validation",
+    "renovate.json / Config validation",
     "JSCPD scan"
   ]
 }
