@@ -1,15 +1,15 @@
 {
   "checks": [
-    "Build (macos-latest)",
-    "Build (ubuntu-latest)",
-    "Conventional pull request title",
-    "GitHub Actions / Workflow validation",
-    "Go lint",
-    "Go vulnerability check",
-    "Release configuration",
-    "Test (macos-latest) / Go Test",
-    "Test (ubuntu-latest) / Go Test",
-    "Renovate / Config validation",
-    "Code duplication (CPD)"
+    "Go / Build CLI (macos-latest)",
+    "Go / Build CLI (ubuntu-latest)",
+    "Title validation",
+    ".github/workflows / Workflow validation",
+    "Go / Static analysis",
+    "Go / Vulnerability analysis",
+    "Release / Configuration validation",
+    "Go (macos-latest) / Package tests",
+    "Go (ubuntu-latest) / Package tests",
+    "renovate.json / Config validation",
+    "JSCPD scan"
   ]
 }

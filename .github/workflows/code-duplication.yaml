@@ -1,18 +1,14 @@
-name: Shared CI
+name: Code duplication
 on:
   pull_request:
 permissions:
   contents: read
 concurrency:
-  group: shared-ci-${{ github.event.pull_request.number }}
+  group: code-duplication-shared-ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
-  renovate:
-    name: Renovate
-    uses: kellen-miller/ci/.github/workflows/renovate-config-validator.yaml@eb1a4f5900aaa6468cffb67513da61078265ba26
-
-  duplication:
-    name: Code duplication (CPD)
+  duplication-analysis:
+    name: JSCPD scan
     permissions:
       contents: read
     runs-on: ubuntu-latest

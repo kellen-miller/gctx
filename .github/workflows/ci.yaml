@@ -1,4 +1,4 @@
-name: CI
+name: gctx
 
 on:
   pull_request:
@@ -7,11 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: CI-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  changes:
+  gctx-paths:
+    name: Changed paths
     runs-on: ubuntu-latest
     outputs:
       changes: ${{ steps.paths.outputs.changes }}
@@ -68,10 +69,10 @@ jobs:
               ]
             }
 
-  go-lint:
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
-    name: Go lint
+  go-static-analysis:
+    name: Go / Static analysis
+    needs: gctx-paths
+    if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).go) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -82,10 +83,10 @@ jobs:
           go-version-file: go.mod
           vulnerability-check: 'false'
 
-  govulncheck:
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
-    name: Go vulnerability check
+  go-vulnerability-analysis:
+    name: Go / Vulnerability analysis
+    needs: gctx-paths
+    if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).go) }}
     runs-on: ubuntu-latest
     steps:
       - name: Run govulncheck
@@ -94,38 +95,10 @@ jobs:
           go-version-file: go.mod
           go-package: ./...
 
-  github-actions-lint:
-    name: GitHub Actions
-    uses: kellen-miller/ci/.github/workflows/gh-actions-lint.yaml@eb1a4f5900aaa6468cffb67513da61078265ba26
-
-  pull-request-title:
-    name: Conventional pull request title
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    steps:
-      - name: Validate pull request title
-        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-
-  release-config:
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).release) }}
-    name: Release configuration
+  release-config-validation:
+    name: Release / Configuration validation
+    needs: gctx-paths
+    if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).release) }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -143,25 +116,26 @@ jobs:
           version: "~> v2"
           args: check
 
-  test:
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
-    name: Test (${{ matrix.os }})
+  go-package-tests:
+    name: Go (${{ matrix.os }})
+    needs: gctx-paths
+    if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).go) }}
     strategy:
       fail-fast: false
       matrix:
         os:
           - ubuntu-latest
           - macos-latest
-    uses: kellen-miller/ci/.github/workflows/go-test.yaml@6d83b6c0e8b6f407fa2f11e1c974449649cfa1f6
+    uses: kellen-miller/ci/.github/workflows/go-test.yaml@c188397b9147dbf21030cf2f3e4fc41bff37358b
     with:
+      check-name: Package tests
       runner: ${{ matrix.os }}
       go-version-file: go.mod
 
-  build:
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || fromJSON(needs.changes.outputs.changes).go) }}
-    name: Build (${{ matrix.os }})
+  build-cli:
+    name: Go / Build CLI (${{ matrix.os }})
+    needs: gctx-paths
+    if: ${{ !cancelled() && (needs.gctx-paths.result != 'success' || fromJSON(needs.gctx-paths.outputs.changes).go) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
